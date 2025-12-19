@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>无限井字棋 - 三子规则</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --cell-size: 100px;
+            --p1-color: #3498db;
+            --p2-color: #e74c3c;
+        }
+
+        body {
+            font-family: 'PingFang SC', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--bg-color);
+            touch-action: manipulation;
+        }
+
+        h2 { color: #333; margin-bottom: 10px; }
+
+        #status {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 1.5em;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, var(--cell-size));
+            grid-template-rows: repeat(3, var(--cell-size));
+            gap: 10px;
+            background-color: #ccc;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .cell:active { transform: scale(0.95); }
+
+        /* 即将消失的棋子样式（变淡） */
+        .fading {
+            opacity: 0.3;
+            filter: grayscale(80%);
+        }
+
+        .cell.X { color: var(--p1-color); }
+        .cell.O { color: var(--p2-color); }
+
+        button {
+            margin-top: 30px;
+            padding: 12px 24px;
+            font-size: 1rem;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>无限井字棋</h2>
+    <div id="status">玩家 X 的回合</div>
+
+    <div class="board" id="board">
+        <div class="cell" data-index="0"></div>
+        <div class="cell" data-index="1"></div>
+        <div class="cell" data-index="2"></div>
+        <div class="cell" data-index="3"></div>
+        <div class="cell" data-index="4"></div>
+        <div class="cell" data-index="5"></div>
+        <div class="cell" data-index="6"></div>
+        <div class="cell" data-index="7"></div>
+        <div class="cell" data-index="8"></div>
+    </div>
+
+    <button onclick="resetGame()">重新开始</button>
+
+    <script>
+        let currentPlayer = 'X';
+        let gameActive = true;
+        let boardState = Array(9).fill(null);
+        
+        // 核心逻辑：记录每个玩家落子的顺序
+        let historyX = []; // 存储 X 落子的索引，最多3个
+        let historyO = []; // 存储 O 落子的索引，最多3个
+
+        const statusDisplay = document.querySelector('#status');
+        const cells = document.querySelectorAll('.cell');
+
+        const winConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横向
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // 纵向
+            [0, 4, 8], [2, 4, 6]             // 对角线
+        ];
+
+        function handleCellClick(e) {
+            const clickedCell = e.target;
+            const index = parseInt(clickedCell.getAttribute('data-index'));
+
+            if (boardState[index] !== null || !gameActive) return;
+
+            // 1. 执行落子
+            placePiece(index);
+
+            // 2. 检查胜负
+            if (checkWin()) {
+                statusDisplay.innerText = `玩家 ${currentPlayer} 获胜！`;
+                gameActive = false;
+                return;
+            }
+
+            // 3. 换人
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            statusDisplay.innerText = `玩家 ${currentPlayer} 的回合`;
+            
+            // 4. 视觉提示：标记下一个会消失的棋子
+            updateVisualHints();
+        }
+
+        function placePiece(index) {
+            boardState[index] = currentPlayer;
+            const currentHistory = currentPlayer === 'X' ? historyX : historyO;
+            
+            // 将新落子加入队列
+            currentHistory.push(index);
+
+            // 如果超过3个，移除最早的一个
+            if (currentHistory.length > 3) {
+                const oldestIndex = currentHistory.shift();
+                boardState[oldestIndex] = null;
+            }
+
+            renderBoard();
+        }
+
+        function renderBoard() {
+            cells.forEach((cell, i) => {
+                cell.innerText = boardState[i] || '';
+                cell.className = 'cell ' + (boardState[i] || '');
+            });
+        }
+
+        function updateVisualHints() {
+            // 清除之前的淡化标记
+            cells.forEach(c => c.classList.remove('fading'));
+            
+            // 找到当前玩家最老的一颗棋子（如果已经有3颗了）
+            const currentHistory = currentPlayer === 'X' ? historyX : historyO;
+            if (currentHistory.length === 3) {
+                const oldestIndex = currentHistory[0];
+                cells[oldestIndex].classList.add('fading');
+            }
+        }
+
+        function checkWin() {
+            return winConditions.some(condition => {
+                return condition.every(index => boardState[index] === currentPlayer);
+            });
+        }
+
+        function resetGame() {
+            currentPlayer = 'X';
+            gameActive = true;
+            boardState = Array(9).fill(null);
+            historyX = [];
+            historyO = [];
+            statusDisplay.innerText = `玩家 X 的回合`;
+            renderBoard();
+        }
+
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+    </script>
+</body>
+</html>
